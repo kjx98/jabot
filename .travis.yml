@@ -1,0 +1,18 @@
+dist: xenial
+language: go
+
+go:
+  - "1.11.x"
+
+before_install:
+  - sudo apt-get update -q
+
+install:
+  - go get github.com/kjx98/golib/to
+  - go get github.com/kjx98/go-xmpp
+  - go get github.com/op/go-logging
+
+
+script:
+    - go build rebot/main.go
+    - go test -v
