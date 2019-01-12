@@ -228,14 +228,14 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 				}
 				switch v.Type {
 				case "subscribe":
-					log.Info("Presence: Approve %s subscription", v.From)
+					log.Infof("Presence: Approve %s subscription", v.From)
 					w.client.ApproveSubscription(v.From)
 					w.client.RequestSubscription(v.From)
 				case "unsubscribe":
-					log.Info("Presence: Revoke %s subscription", v.From)
+					log.Infof("Presence: Revoke %s subscription", v.From)
 					w.client.RevokeSubscription(v.From)
 				default:
-					log.Info("Presence: %s %s Type(%s)\n", v.From, v.Show, v.Type)
+					log.Infof("Presence: %s %s Type(%s)\n", v.From, v.Show, v.Type)
 				}
 			case xmpp.Roster, xmpp.Contact:
 				log.Info("Roster/Contact:", v)
@@ -308,14 +308,6 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 									// try vCard
 								}
 							}
-							/*
-								//may loop whiel presence is unavailable
-								if item.Subscription == "from" {
-									fmt.Printf("%s Approve %s subscription\n",
-										v.To, item.Jid)
-									talk.RequestSubscription(item.Jid)
-								}
-							*/
 							log.Infof("roster item %s subscription(%s), %v\n",
 								item.Jid, item.Subscription, item.Group)
 							if v.Type == "set" && item.Subscription == "both" {
@@ -329,9 +321,9 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 					continue
 				}
 				if v.Type == "result" && v.ID == "c2s1" {
-					fmt.Printf("Got pong from %s to %s\n", v.From, v.To)
+					log.Infof("Got pong from %s to %s\n", v.From, v.To)
 				} else {
-					fmt.Printf("Got from %s to %s IQ, tag: (%v), query(%s)\n",
+					log.Infof("Got from %s to %s IQ, tag: (%v), query(%s)\n",
 						v.From, v.To, v.QueryName, v.Query)
 				}
 			default:
