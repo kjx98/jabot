@@ -132,7 +132,7 @@ func main() {
 					if v.Type == "" {
 						// query vcard
 						talk.RawInformation(v.To, v.From, "vc1", "get",
-							"<vCard xmlns='vcard-temp'/>")
+							"<vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>")
 					}
 					fmt.Printf("Presence: %s -> %s %s Type(%s)\n", v.From,
 						v.To, v.Show, v.Type)

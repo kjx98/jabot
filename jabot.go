@@ -3,7 +3,6 @@ package jabot
 import (
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"math/rand"
 	"os"
 	"runtime"
@@ -23,6 +22,7 @@ type Jabot struct {
 	client     *xmpp.Client
 	auto       bool
 	bConnected bool
+	lastAct    time.Time
 	robotName  string
 	defJid     string
 	contacts   map[string]Contact
@@ -93,24 +93,37 @@ func (w *Jabot) GetContact() error {
 	return w.client.Roster()
 }
 
-func (w *Jabot) updateContacts(contact Contact) {
+func nickName(name string) string {
+	if a := strings.SplitN(name, "@", 2); len(a) == 2 {
+		return a[0]
+	}
+	return name
+}
+
+func (w *Jabot) updateContacts(contact *Contact) {
 	if contact.NickName == "" {
-		contact.NickName = contact.Jid
+		if contact.Name != "" {
+			contact.NickName = contact.Name
+		} else {
+			contact.NickName = nickName(contact.Jid)
+		}
 	}
 	if cc, ok := w.contacts[contact.Jid]; ok {
 		// keep online status
 		contact.Online = cc.Online
 	}
-	w.contacts[contact.Jid] = contact
+	w.contacts[contact.Jid] = *contact
 }
 
 func (w *Jabot) SendMessage(message string, to string) error {
+	w.lastAct = time.Now()
 	chat := xmpp.Chat{Remote: to, Type: "chat", Text: message}
 	_, err := w.client.Send(chat)
 	return err
 }
 
 func (w *Jabot) SendGroupMessage(message string, to string) error {
+	w.lastAct = time.Now()
 	chat := xmpp.Chat{Remote: to, Type: "groupchat", Text: message}
 	_, err := w.client.Send(chat)
 	return err
@@ -125,6 +138,10 @@ func (w *Jabot) RegisterHandle(cmd string, cmdFunc HandlerFunc) error {
 }
 
 func (w *Jabot) getNickName(userName string) string {
+	// strip resource
+	if a := strings.SplitN(userName, "/", 2); len(a) == 2 {
+		userName = a[0]
+	}
 	if v, ok := w.contacts[userName]; ok {
 		return v.NickName
 	}
@@ -136,9 +153,14 @@ func (w *Jabot) getNickName(userName string) string {
 }
 
 func (w *Jabot) handle(m *xmpp.Chat) error {
-	if m.Remote != w.cfg.Jid {
-		//log.Info("[*] ", w.getNickName(m.Remote), ": ", m.Text)
-		cmds := strings.Split(strings.TrimSpace(m.Text), ",")
+	content := strings.TrimSpace(m.Text)
+	if content == "" {
+		return nil
+	}
+	from := w.getNickName(m.Remote)
+	if from != w.nickName {
+		log.Info("[*] ", from, ": ", m.Text)
+		cmds := strings.Split(content, ",")
 		if len(cmds) == 0 {
 			return nil
 		}
@@ -149,11 +171,11 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 				if err := w.SendMessage(reply, m.Remote); err != nil {
 					return err
 				}
-				log.Info("[#] ", w.nickName, ": ", reply)
+				log.Info("[#] ", w.getNickName(w.cfg.Jid), ": ", reply)
 			}
 		} else {
 			if w.auto {
-				reply, err := w.getTulingReply(m.Text, m.Remote)
+				reply, err := w.getTulingReply(content, m.Remote)
 				if err != nil {
 					return err
 				}
@@ -165,7 +187,6 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 			}
 		}
 	} else {
-		content := strings.TrimSpace(m.Text)
 		switch content {
 		case "退下":
 			w.auto = false
@@ -195,6 +216,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 
 func (w *Jabot) Dail() error {
 	if err := w.dailLoop(0); err != nil {
+		w.bConnected = false
 		return err
 	}
 	return nil
@@ -257,10 +279,10 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						log.Info(v.QueryName.Space, "type:", v.Type, " with:", v.Query)
 						continue
 					}
-					//tt := time.Now().Sub(loginTime)
-					//last := int(tt.Seconds())
-					//if err := w.RawLast(v.To, v.From, v.ID, last); err != nil {
-					if err := w.RawLastNA(v.To, v.From, v.ID); err != nil {
+					tt := time.Now().Sub(w.lastAct)
+					last := int(tt.Seconds())
+					//if err := w.RawLastNA(v.To, v.From, v.ID); err != nil {
+					if err := w.RawLast(v.To, v.From, v.ID, last); err != nil {
 						log.Info("RawLast:", err)
 					}
 					continue
@@ -291,22 +313,34 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 							continue
 						} else {
 							cc := w.contacts[item.Jid]
-							if item.Subscription == "remove" {
-								cc.Subscription = ""
-								if cc.Jid != "" {
-									w.updateContacts(cc)
-								}
-								continue
-							}
 							cc.Jid = item.Jid
 							cc.Name = item.Name
 							cc.Subscription = item.Subscription
 							cc.Group = item.Group
+							if item.Subscription == "remove" {
+								cc.Subscription = ""
+								if cc.Jid != "" {
+									w.updateContacts(&cc)
+								}
+								continue
+							}
 							if cc.Jid != "" {
-								w.updateContacts(cc)
+								w.updateContacts(&cc)
 								if cc.Name == "" || cc.NickName == "" {
 									// try vCard
 								}
+								if w.nickName == "" && cc.Jid == w.cfg.Jid {
+									w.nickName = cc.NickName
+									if w.nickName == "" {
+										w.nickName = nickName(cc.Jid)
+									}
+								}
+							}
+							if cc.Jid != "" && item.Subscription == "from" &&
+								cc.Online {
+								log.Infof("roster: Approve %s subscription", cc.Jid)
+								//w.client.ApproveSubscription(cc.Jid)
+								w.client.RequestSubscription(cc.Jid)
 							}
 							log.Infof("roster item %s subscription(%s), %v\n",
 								item.Jid, item.Subscription, item.Group)
@@ -342,12 +376,18 @@ func (w *Jabot) Connect() error {
 		Status:        "xa",
 		StatusMessage: "I'm gopher jabber",
 	}
+	/*
+		xmpp.DefaultConfig = tls.Config{
+			InsecureSkipVerify: true,
+		}
+	*/
 	if talk, err := options.NewClient(); err != nil {
 		return err
 	} else {
 		w.client = talk
 		w.bConnected = true
 	}
+	w.lastAct = time.Now()
 	w.GetContact()
 	return nil
 }

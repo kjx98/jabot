@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/kjx98/jabot"
+	"os"
+	"strings"
 )
 
 func main() {
@@ -20,5 +23,25 @@ func main() {
 		fmt.Println("Connect", err)
 		return
 	}
-	rebot.Dail()
+	go rebot.Dail()
+	for {
+		if !rebot.IsConnected() {
+			fmt.Println("xmpp broken, exit")
+			break
+		}
+		in := bufio.NewReader(os.Stdin)
+		line, err := in.ReadString('\n')
+		if err != nil {
+			continue
+		}
+		if len(line) >= 4 && line[:4] == "quit" {
+			break
+		}
+		line = strings.TrimRight(line, "\n")
+
+		tokens := strings.SplitN(line, " ", 2)
+		if len(tokens) == 2 {
+			rebot.SendMessage(tokens[1], tokens[0])
+		}
+	}
 }
