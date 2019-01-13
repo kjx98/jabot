@@ -131,8 +131,19 @@ func main() {
 				default:
 					if v.Type == "" {
 						// query vcard
-						talk.RawInformation(v.To, v.From, "vc1", "get",
-							"<vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>")
+						var from string
+						if a := strings.SplitN(v.From, "/", 2); len(a) == 2 {
+							from = a[0]
+						} else {
+							from = v.From
+						}
+						_ = from
+						/*
+							talk.RawInformation(v.To, v.From, "vc1", "get",
+								"<vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>")
+						*/
+						talk.RawInformation(v.To, v.From, "vc2", "get",
+							"<vcard xmlns='vcard-temp'/>")
 					}
 					fmt.Printf("Presence: %s -> %s %s Type(%s)\n", v.From,
 						v.To, v.Show, v.Type)
