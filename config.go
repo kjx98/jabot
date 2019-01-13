@@ -4,6 +4,7 @@ type Config struct {
 	Tuling Tuling `yaml:"tuling"`
 	Jid    string
 	Passwd string
+	DefJid string
 }
 
 type Tuling struct {
@@ -18,7 +19,7 @@ func NewConfig(key string) Config {
 		key = "808811ad0fd34abaa6fe800b44a9556a"
 	}
 	var cfg = Config{Tuling{URL: url,
-		KeyAPI: key}, "", "",
+		KeyAPI: key}, "", "", "",
 	}
 	return cfg
 }

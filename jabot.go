@@ -23,8 +23,6 @@ type Jabot struct {
 	auto       bool
 	bConnected bool
 	lastAct    time.Time
-	robotName  string
-	defJid     string
 	contacts   map[string]Contact
 }
 
@@ -40,6 +38,7 @@ type Contact struct {
 var (
 	errLoginFail    = errors.New("Login failed")
 	errLoginTimeout = errors.New("Login time out")
+	errNoConn       = errors.New("No connection to server")
 	errHandleExist  = errors.New("命令处理器已经存在")
 )
 var log = logging.MustGetLogger("jabot")
@@ -49,7 +48,6 @@ var log = logging.MustGetLogger("jabot")
 type HandlerFunc func(args []string) string
 
 var handlers = map[string]HandlerFunc{}
-var weGroups = map[string]string{}
 
 func NewJabot(cfg *Config) (*Jabot, error) {
 	rand.Seed(time.Now().Unix())
@@ -84,11 +82,6 @@ func (w *Jabot) SetLogLevel(l logging.Level) {
 	logging.SetLevel(l, "jabot")
 }
 
-func (w *Jabot) SetRobotName(name string) {
-	w.robotName = name
-	//w.auto = false
-}
-
 func (w *Jabot) GetContact() error {
 	return w.client.Roster()
 }
@@ -116,6 +109,9 @@ func (w *Jabot) updateContacts(contact *Contact) {
 }
 
 func (w *Jabot) SendMessage(message string, to string) error {
+	if !w.bConnected {
+		return errNoConn
+	}
 	w.lastAct = time.Now()
 	chat := xmpp.Chat{Remote: to, Type: "chat", Text: message}
 	_, err := w.client.Send(chat)
@@ -123,6 +119,9 @@ func (w *Jabot) SendMessage(message string, to string) error {
 }
 
 func (w *Jabot) SendGroupMessage(message string, to string) error {
+	if !w.bConnected {
+		return errNoConn
+	}
 	w.lastAct = time.Now()
 	chat := xmpp.Chat{Remote: to, Type: "groupchat", Text: message}
 	_, err := w.client.Send(chat)
@@ -202,7 +201,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 			if cmdFunc, ok := handlers[strings.Trim(cmds[0], " \t")]; ok {
 				reply := cmdFunc(cmds[1:])
 				if reply != "" {
-					if err := w.SendMessage(reply, w.defJid); err != nil {
+					if err := w.SendMessage(reply, w.cfg.DefJid); err != nil {
 						log.Warning("send myself to defGroup", err)
 						return err
 					}
@@ -384,6 +383,9 @@ func (w *Jabot) Connect() error {
 	if talk, err := options.NewClient(); err != nil {
 		return err
 	} else {
+		if w.client != nil {
+			w.client.Close()
+		}
 		w.client = talk
 		w.bConnected = true
 	}
