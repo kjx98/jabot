@@ -35,6 +35,13 @@ type Contact struct {
 	Subscription string
 }
 
+type vcardTemp struct {
+	Name      string `xml:"FN"`
+	NickName  string `xml:"NICKNAME"`
+	PhotoType string `xml:"PHOTO>TYPE"`
+	PhotoImg  []byte `xml:"PHOTO>BINVAL"`
+}
+
 var (
 	errLoginFail    = errors.New("Login failed")
 	errLoginTimeout = errors.New("Login time out")
@@ -93,6 +100,13 @@ func nickName(name string) string {
 	return name
 }
 
+func getJid(addr string) string {
+	if a := strings.SplitN(addr, "/", 2); len(a) == 2 {
+		return a[0]
+	}
+	return addr
+}
+
 func (w *Jabot) updateContacts(contact *Contact) {
 	if contact.NickName == "" {
 		if contact.Name != "" {
@@ -138,9 +152,7 @@ func (w *Jabot) RegisterHandle(cmd string, cmdFunc HandlerFunc) error {
 
 func (w *Jabot) getNickName(userName string) string {
 	// strip resource
-	if a := strings.SplitN(userName, "/", 2); len(a) == 2 {
-		userName = a[0]
-	}
+	userName = getJid(userName)
 	if v, ok := w.contacts[userName]; ok {
 		return v.NickName
 	}
@@ -256,24 +268,42 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 					log.Infof("Presence: Revoke %s subscription", v.From)
 					w.client.RevokeSubscription(v.From)
 				default:
+					jid := getJid(v.From)
+					if v.Type == "" {
+						// query vcard
+						cc := w.contacts[jid]
+						//w.updateContacts(&cc)
+						cc.Online = true
+						w.contacts[jid] = cc
+						if cc.Name == "" || cc.NickName == "" {
+							w.client.RawInformation(v.To, jid, "vc", "get",
+								"<vCard xmlns='vcard-temp'/>")
+						}
+					} else if v.Type == "unavailble" {
+						cc := w.contacts[jid]
+						if cc.Jid == jid {
+							cc.Online = false
+							w.contacts[jid] = cc
+						}
+					}
 					log.Infof("Presence: %s %s Type(%s)\n", v.From, v.Show, v.Type)
 				}
 			case xmpp.Roster, xmpp.Contact:
 				log.Info("Roster/Contact:", v)
 			case xmpp.IQ:
 				// ping ignore
-				switch v.QueryName.Space {
-				case "jabber:iq:version":
+				switch v.QueryName.Space + " " + v.QueryName.Local {
+				case "jabber:iq:version query":
 					if v.Type != "get" {
 						log.Info(v.QueryName.Space, "type:", v.Type, " with:", v.Query)
 						continue
 					}
-					if err := w.RawVersion(v.To, v.From, v.ID,
-						"0.1", runtime.GOOS); err != nil {
+					if err := w.RawVersion(v.To, v.From, v.ID, "0.1",
+						runtime.GOOS); err != nil {
 						log.Info("RawVersion:", err)
 					}
 					continue
-				case "jabber:iq:last":
+				case "jabber:iq:last query":
 					if v.Type != "get" {
 						log.Info(v.QueryName.Space, "type:", v.Type, " with:", v.Query)
 						continue
@@ -285,7 +315,7 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						log.Info("RawLast:", err)
 					}
 					continue
-				case "urn:xmpp:time":
+				case "urn:xmpp:time time":
 					if v.Type != "get" {
 						log.Info(v.QueryName.Space, "type:", v.Type, " with:", v.Query)
 						continue
@@ -294,65 +324,82 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						log.Info("RawIQtime:", err)
 					}
 					continue
-				case "jabber:iq:roster":
-					var item rosterItem
+				case "jabber:iq:roster query":
+					type rosterItems struct {
+						Items []rosterItem `xml:"item"`
+					}
+					var roster rosterItems
 					if v.Type != "result" && v.Type != "set" {
 						// only result and set processed
 						log.Info("jabber:iq:roster, type:", v.Type)
 						continue
 					}
-					vv := strings.Split(v.Query, "/>")
-					for _, ss := range vv {
-						if strings.TrimSpace(ss) == "" {
-							continue
-						}
-						ss += "/>"
-						if err := xml.Unmarshal([]byte(ss), &item); err != nil {
-							log.Error("unmarshal roster <query>: ", err)
-							continue
-						} else {
-							cc := w.contacts[item.Jid]
+					ss := "<roster>" + v.Query + "</roster>"
+					if err := xml.Unmarshal([]byte(ss), &roster); err != nil {
+						log.Error("unmarshal roster <query>: ", err)
+						continue
+					}
+					for _, item := range roster.Items {
+						cc, ok := w.contacts[item.Jid]
+						if !ok {
 							cc.Jid = item.Jid
 							cc.Name = item.Name
-							cc.Subscription = item.Subscription
-							cc.Group = item.Group
-							if item.Subscription == "remove" {
-								cc.Subscription = ""
-								if cc.Jid != "" {
-									w.updateContacts(&cc)
-								}
-								continue
-							}
+						}
+						cc.Subscription = item.Subscription
+						cc.Group = item.Group
+						if item.Subscription == "remove" {
+							cc.Subscription = ""
 							if cc.Jid != "" {
 								w.updateContacts(&cc)
-								if cc.Name == "" || cc.NickName == "" {
-									// try vCard
-								}
-								if w.nickName == "" && cc.Jid == w.cfg.Jid {
-									if cc.NickName != "" {
-										w.nickName = cc.NickName
-									} else if cc.Name != "" {
-										w.nickName = cc.Name
-									} else {
-										w.nickName = nickName(cc.Jid)
-									}
-								}
 							}
-							if cc.Jid != "" && item.Subscription == "from" &&
-								cc.Online {
-								log.Infof("roster: Approve %s subscription", cc.Jid)
-								//w.client.ApproveSubscription(cc.Jid)
-								w.client.RequestSubscription(cc.Jid)
-							}
-							log.Infof("roster item %s subscription(%s), %v\n",
-								item.Jid, item.Subscription, item.Group)
-							if v.Type == "set" && item.Subscription == "both" {
-								// shall we check presence unavailable
-								pr := xmpp.Presence{From: v.To, To: item.Jid,
-									Show: "xa"}
-								w.client.SendPresence(pr)
+							continue
+						}
+						if cc.Jid != "" {
+							w.updateContacts(&cc)
+							// never query vcard here, may loops
+							if cc.Name == "" || cc.NickName == "" {
+								// try vCard
 							}
 						}
+						if item.Subscription == "from" && cc.Online {
+							log.Infof("roster: Approve %s subscription", cc.Jid)
+							//w.client.ApproveSubscription(cc.Jid)
+							w.client.RequestSubscription(cc.Jid)
+						}
+						log.Infof("roster item %s subscription(%s), %v\n",
+							item.Jid, item.Subscription, item.Group)
+						if v.Type == "set" && item.Subscription == "both" {
+							// shall we check presence unavailable
+							pr := xmpp.Presence{From: v.To, To: item.Jid,
+								Show: "xa"}
+							w.client.SendPresence(pr)
+						}
+					}
+					continue
+				case "vcard-temp vCard":
+					var it vcardTemp
+					ss := "<vCard>" + v.Query + "</vCard>"
+					if err := xml.Unmarshal([]byte(ss), &it); err == nil {
+						jid := getJid(v.From)
+						cc := w.contacts[jid]
+						if cc.Name == "" || cc.Jid == "" {
+							cc.Jid = jid
+							cc.Name = it.Name
+						}
+						cc.NickName = it.NickName
+						if it.Name != "" {
+							w.updateContacts(&cc)
+						}
+						if it.PhotoType == "image/png" {
+							if fd, err := os.Create("/tmp/" + jid + ".png"); err == nil {
+								fd.Write(it.PhotoImg)
+								fd.Close()
+							}
+						}
+						log.Infof("Got vCard for %s, FN:%s, Nick:%s, ImLen:%d",
+							v.From, it.Name, it.NickName, len(it.PhotoImg))
+					} else {
+						log.Error("vcard-temp vCard", err)
 					}
 					continue
 				}

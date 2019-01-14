@@ -78,7 +78,7 @@ func main() {
 		Debug:         *debug,
 		Session:       *session,
 		Status:        *status,
-		Resource:      "bot",
+		Resource:      "exam-bot",
 		StatusMessage: *statusMessage,
 	}
 
@@ -138,12 +138,10 @@ func main() {
 							from = v.From
 						}
 						_ = from
-						/*
-							talk.RawInformation(v.To, v.From, "vc1", "get",
-								"<vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>")
-						*/
-						talk.RawInformation(v.To, v.From, "vc2", "get",
-							"<vcard xmlns='vcard-temp'/>")
+						talk.RawInformation(options.User, from, "vc", "get",
+							"<vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>")
+						talk.RawInformation(options.User, from, "vc", "get",
+							"<vCard xmlns='vcard-temp'/>")
 					}
 					fmt.Printf("Presence: %s -> %s %s Type(%s)\n", v.From,
 						v.To, v.Show, v.Type)
@@ -241,7 +239,7 @@ func main() {
 	}()
 	// get roster first
 	talk.Roster()
-	//talk.Discovery()
+	talk.Discovery()
 	//talk.RevokeSubscription("wkpb@hot-chilli.net")
 	//talk.SendOrg("<presence from='wkpb@hot-chilli.net' to='kjx@hot-chilli.net' type='subscribe'/>")
 	// test conf
