@@ -259,7 +259,10 @@ func main() {
 
 		tokens := strings.SplitN(line, " ", 2)
 		if len(tokens) == 2 {
-			talk.Send(xmpp.Chat{Remote: tokens[0], Type: "chat", Text: tokens[1]})
+			if _, err := talk.Send(xmpp.Chat{Remote: tokens[0], Type: "chat",
+				Text: tokens[1]}); err != nil {
+				fmt.Println("talk.Send", err)
+			}
 		}
 	}
 	talk.SendOrg("</stream:stream")

@@ -329,8 +329,11 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 									// try vCard
 								}
 								if w.nickName == "" && cc.Jid == w.cfg.Jid {
-									w.nickName = cc.NickName
-									if w.nickName == "" {
+									if cc.NickName != "" {
+										w.nickName = cc.NickName
+									} else if cc.Name != "" {
+										w.nickName = cc.Name
+									} else {
 										w.nickName = nickName(cc.Jid)
 									}
 								}
