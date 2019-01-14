@@ -16,7 +16,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	rebot.SetRobotName("JacK")
 	rebot.RegisterTimeCmd()
 
 	if err := rebot.Connect(); err != nil {
@@ -24,11 +23,7 @@ func main() {
 		return
 	}
 	go rebot.Dail()
-	for {
-		if !rebot.IsConnected() {
-			fmt.Println("xmpp broken, exit")
-			break
-		}
+	for rebot.IsConnected() {
 		in := bufio.NewReader(os.Stdin)
 		line, err := in.ReadString('\n')
 		if err != nil {

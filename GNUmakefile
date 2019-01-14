@@ -27,7 +27,7 @@ bin/rebot: rebot/main.go config.go jabot.go
 	go build -o bin/rebot rebot/main.go
 	@strip $@ || echo "rebot OK"
 
-bin/example: example/example.go
+bin/example: example/example.go config.go jabot.go
 	@[ -d bin ] || mkdir bin
 	go build -o bin/example example/example.go
 
