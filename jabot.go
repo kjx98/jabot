@@ -390,14 +390,17 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						if it.Name != "" {
 							w.updateContacts(&cc)
 						}
-						if it.PhotoType == "image/png" {
-							if fd, err := os.Create("/tmp/" + jid + ".png"); err == nil {
-								fd.Write(it.PhotoImg)
-								fd.Close()
+						/*
+							if it.PhotoType == "image/png" {
+								// PhotoImg is base64 []byte
+								if fd, err := os.Create("/tmp/" + jid + ".png"); err == nil {
+									fd.Write(pImg)
+									fd.Close()
+								}
 							}
-						}
-						log.Infof("Got vCard for %s, FN:%s, Nick:%s, ImLen:%d",
-							v.From, it.Name, it.NickName, len(it.PhotoImg))
+						*/
+						log.Infof("Got vCard for %s, FN:%s, Nick:%s",
+							v.From, it.Name, it.NickName)
 					} else {
 						log.Error("vcard-temp vCard", err)
 					}
