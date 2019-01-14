@@ -394,6 +394,15 @@ func (w *Jabot) Connect() error {
 	return nil
 }
 
+func (w *Jabot) Close() error {
+	if w.client == nil {
+		return errNoConn
+	}
+	w.client.Close()
+	w.client = nil
+	return nil
+}
+
 func NewJabotConn(talk *xmpp.Client) *Jabot {
 	rand.Seed(time.Now().Unix())
 	randID := strconv.Itoa(rand.Int())
