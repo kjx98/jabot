@@ -1,6 +1,7 @@
 package jabot
 
 import (
+	"crypto/tls"
 	"encoding/xml"
 	"errors"
 	"math/rand"
@@ -378,11 +379,9 @@ func (w *Jabot) Connect() error {
 		Status:        "xa",
 		StatusMessage: "I'm gopher jabber",
 	}
-	/*
-		xmpp.DefaultConfig = tls.Config{
-			InsecureSkipVerify: true,
-		}
-	*/
+	xmpp.DefaultConfig = tls.Config{
+		InsecureSkipVerify: true,
+	}
 	if talk, err := options.NewClient(); err != nil {
 		return err
 	} else {
