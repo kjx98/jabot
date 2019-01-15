@@ -183,10 +183,14 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 		return nil
 	}
 	from := w.getNickName(m.Remote)
-	if hookName == from && hookFunc != nil {
-		hookFunc(content)
+	if hookName != "" {
+		log.Info("[H*] ", from, ": ", m.Text)
+		if (hookName == from || from == "") && hookFunc != nil {
+			hookFunc(content)
+		}
 		return nil
-	} else if from != w.nickName {
+	}
+	if from != w.nickName {
 		log.Info("[*] ", from, ": ", m.Text)
 		cmds := strings.Split(content, ",")
 		if len(cmds) == 0 {
@@ -412,7 +416,11 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 							cc.Jid = jid
 							cc.Name = it.Name
 						}
-						cc.NickName = it.NickName
+						if nicN := it.NickName; nicN != "" {
+							cc.NickName = nicN
+						} else {
+							cc.NickName = nickName(jid)
+						}
 						if it.Name != "" {
 							w.updateContacts(&cc)
 						}
@@ -430,8 +438,8 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 								}
 							*/
 						}
-						log.Infof("Got vCard for %s, FN:%s, Nick:%s",
-							v.From, it.Name, it.NickName)
+						log.Infof("Got vCard for %s, FN:%s, Nick:%s/%s",
+							v.From, it.Name, it.NickName, cc.NickName)
 					} else {
 						log.Error("vcard-temp vCard", err)
 					}
@@ -507,7 +515,7 @@ func (w *Jabot) IsConnected() bool {
 //	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
 func init() {
 	var format = logging.MustStringFormatter(
-		`%{color}%{time:01-02 15:04:05}  ▶ %{level:.4s} %{color:reset} %{message}`,
+		`%{color}%{time:02 15:04:05}  ▶ %{level:.4s} %{color:reset} %{message}`,
 	)
 
 	logback := logging.NewLogBackend(os.Stderr, "", 0)
