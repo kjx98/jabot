@@ -172,7 +172,7 @@ func main() {
 						continue
 					}
 					if err := wx.RawVersion(v.To, v.From, v.ID,
-						"0.1", runtime.GOOS); err != nil {
+						"example 0.1", runtime.GOOS); err != nil {
 						fmt.Println("RawVersion:", err)
 					}
 					continue

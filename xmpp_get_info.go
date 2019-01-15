@@ -6,7 +6,7 @@ import (
 )
 
 func (c *Jabot) RawVersion(from, to, id, version, osName string) error {
-	body := "<name>go-xmpp</name><version>" + version + "</version><os>" +
+	body := "<name>jabot/go-xmpp</name><version>" + version + "</version><os>" +
 		osName + "</os>"
 	_, err := c.client.RawInformationQuery(from, to, id, "result", "jabber:iq:version",
 		body)
