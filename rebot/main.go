@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"flag"
+	"fmt"
 	"github.com/kjx98/jabot"
 	"os"
 	"strings"
@@ -11,13 +11,14 @@ import (
 
 var username = flag.String("username", "test@localhost", "username")
 var password = flag.String("password", "testme", "password")
+
 func main() {
-    flag.Usage = func() {
-        fmt.Fprintf(os.Stderr, "usage: rebot [options]\n")
-        flag.PrintDefaults()
-        os.Exit(2)
-    }
-    flag.Parse()
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: rebot [options]\n")
+		flag.PrintDefaults()
+		os.Exit(2)
+	}
+	flag.Parse()
 	cfg := jabot.NewConfig("")
 	cfg.Jid = *username
 	cfg.Passwd = *password
@@ -38,7 +39,7 @@ func main() {
 		if err != nil {
 			continue
 		}
-		if len(line) >= 4 && line[:4] == "quit" {
+		if len(line) >= 4 && strings.ToLower(line[:4]) == "quit" {
 			break
 		}
 		line = strings.TrimRight(line, "\n")

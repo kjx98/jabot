@@ -2,6 +2,7 @@ package jabot
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"math/rand"
@@ -205,7 +206,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 		case "来人":
 			w.auto = true
 		default:
-			//log.Info("[*#] ", w.nickName, ": ", m.Text)
+			log.Info("[##] ", w.nickName, ": ", m.Text)
 			cmds := strings.Split(content, ",")
 			if len(cmds) == 0 {
 				return nil
@@ -293,10 +294,15 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 				log.Info("Roster/Contact:", v)
 			case xmpp.IQ:
 				// ping ignore
-				switch v.QueryName.Space + " " + v.QueryName.Local {
+				var query xml.Name
+				if len(v.Query) > 0 && xml.Unmarshal(v.Query, &query) != nil {
+					log.Warning("xml.Unmarshal IQ", err)
+					continue
+				}
+				switch query.Space + " " + query.Local {
 				case "jabber:iq:version query":
 					if v.Type != "get" {
-						log.Info(v.QueryName.Space, "type:", v.Type, " with:", v.Query)
+						log.Info("type:", v.Type, " with:", string(v.Query))
 						continue
 					}
 					if err := w.RawVersion(v.To, v.From, v.ID, "0.1",
@@ -306,7 +312,7 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 					continue
 				case "jabber:iq:last query":
 					if v.Type != "get" {
-						log.Info(v.QueryName.Space, "type:", v.Type, " with:", v.Query)
+						log.Info("type:", v.Type, " with:", string(v.Query))
 						continue
 					}
 					tt := time.Now().Sub(w.lastAct)
@@ -318,7 +324,7 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 					continue
 				case "urn:xmpp:time time":
 					if v.Type != "get" {
-						log.Info(v.QueryName.Space, "type:", v.Type, " with:", v.Query)
+						log.Info("type:", v.Type, " with:", string(v.Query))
 						continue
 					}
 					if err := w.RawIQtime(v.To, v.From, v.ID); err != nil {
@@ -335,8 +341,7 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						log.Info("jabber:iq:roster, type:", v.Type)
 						continue
 					}
-					ss := "<roster>" + v.Query + "</roster>"
-					if err := xml.Unmarshal([]byte(ss), &roster); err != nil {
+					if err := xml.Unmarshal(v.Query, &roster); err != nil {
 						log.Error("unmarshal roster <query>: ", err)
 						continue
 					}
@@ -379,9 +384,14 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 					continue
 				case "vcard-temp vCard":
 					var it vcardTemp
-					ss := "<vCard>" + v.Query + "</vCard>"
-					if err := xml.Unmarshal([]byte(ss), &it); err == nil {
+					if err := xml.Unmarshal(v.Query, &it); err == nil {
 						jid := getJid(v.From)
+						if v.From == "" {
+							// vCard for me
+							jid = w.cfg.Jid
+							w.nickName = it.NickName
+							log.Info("Got nickName of myself:", it.NickName)
+						}
 						cc := w.contacts[jid]
 						if cc.Name == "" || cc.Jid == "" {
 							cc.Jid = jid
@@ -391,15 +401,20 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						if it.Name != "" {
 							w.updateContacts(&cc)
 						}
-						/*
-							if it.PhotoType == "image/png" {
+						pImg, err := base64.StdEncoding.DecodeString(
+							string(it.PhotoImg))
+						if err != nil {
+							log.Info("base64 decode:", err)
+						} else if it.PhotoType == "image/png" {
+							_ = pImg
+							/*
 								// PhotoImg is base64 []byte
 								if fd, err := os.Create("/tmp/" + jid + ".png"); err == nil {
 									fd.Write(pImg)
 									fd.Close()
 								}
-							}
-						*/
+							*/
+						}
 						log.Infof("Got vCard for %s, FN:%s, Nick:%s",
 							v.From, it.Name, it.NickName)
 					} else {
@@ -411,7 +426,7 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 					log.Infof("Got pong from %s to %s\n", v.From, v.To)
 				} else {
 					log.Infof("Got from %s to %s IQ, tag: (%v), query(%s)\n",
-						v.From, v.To, v.QueryName, v.Query)
+						v.From, v.To, query, string(v.Query))
 				}
 			default:
 				log.Infof("def: %v\n", v)

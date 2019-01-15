@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/xml"
 	"flag"
 	"fmt"
@@ -30,6 +31,13 @@ type rosterItem struct {
 	Name         string   `xml:"name,attr"`
 	Subscription string   `xml:"subscription,attr"`
 	Group        []string `xml:"group"`
+}
+
+type vcardTemp struct {
+	Name      string `xml:"FN"`
+	NickName  string `xml:"NICKNAME"`
+	PhotoType string `xml:"PHOTO>TYPE"`
+	PhotoImg  []byte `xml:"PHOTO>BINVAL"`
 }
 
 type contactType struct {
@@ -137,9 +145,10 @@ func main() {
 						} else {
 							from = v.From
 						}
-						_ = from
-						talk.RawInformation(options.User, from, "vc", "get",
-							"<vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>")
+						/*
+							talk.RawInformation(options.User, from, "vc", "get",
+								"<vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>")
+						*/
 						talk.RawInformation(options.User, from, "vc", "get",
 							"<vCard xmlns='vcard-temp'/>")
 					}
@@ -150,12 +159,16 @@ func main() {
 				// TODO: update local roster
 				fmt.Println("Roster/Contact:", v)
 			case xmpp.IQ:
+				var query xml.Name
+				if len(v.Query) > 0 && xml.Unmarshal(v.Query, &query) != nil {
+					fmt.Println("xml.Unmarshal IQ", err)
+					continue
+				}
 				// ping ignore
-				switch v.QueryName.Space {
+				switch query.Space {
 				case "jabber:iq:version":
 					if v.Type != "get" {
-						fmt.Println(v.QueryName.Space, "type:", v.Type,
-							" with:", v.Query)
+						fmt.Println("type:", v.Type, " with:", string(v.Query))
 						continue
 					}
 					if err := wx.RawVersion(v.To, v.From, v.ID,
@@ -165,8 +178,7 @@ func main() {
 					continue
 				case "jabber:iq:last":
 					if v.Type != "get" {
-						fmt.Println(v.QueryName.Space, "type:", v.Type,
-							" with:", v.Query)
+						fmt.Println("type:", v.Type, " with:", string(v.Query))
 						continue
 					}
 					//tt := time.Now().Sub(loginTime)
@@ -178,8 +190,7 @@ func main() {
 					continue
 				case "urn:xmpp:time":
 					if v.Type != "get" {
-						fmt.Println(v.QueryName.Space, "type:", v.Type,
-							" with:", v.Query)
+						fmt.Println("type:", v.Type, " with:", string(v.Query))
 						continue
 					}
 					if err := wx.RawIQtime(v.To, v.From, v.ID); err != nil {
@@ -187,42 +198,63 @@ func main() {
 					}
 					continue
 				case "jabber:iq:roster":
-					var item rosterItem
+					type rosterItems struct {
+						Items []rosterItem `xml:"item"`
+					}
+					var roster rosterItems
 					if v.Type != "result" && v.Type != "set" {
 						// only result and set processed
 						fmt.Println("jabber:iq:roster, type:", v.Type)
 						continue
 					}
-					vv := strings.Split(v.Query, "/>")
-					for _, ss := range vv {
-						if strings.TrimSpace(ss) == "" {
+					if err := xml.Unmarshal(v.Query, &roster); err != nil {
+						fmt.Println("roster unmarshal", err)
+						continue
+					}
+					if len(roster.Items) == 0 {
+						break
+					}
+					for _, item := range roster.Items {
+						if item.Subscription == "remove" {
 							continue
 						}
-						ss += "/>"
-						if err := xml.Unmarshal([]byte(ss), &item); err != nil {
-							fmt.Println("unmarshal roster <query>: ", err)
-							continue
-						} else {
-							if item.Subscription == "remove" {
-								continue
+						/*
+							//may loop whiel presence is unavailable
+							if item.Subscription == "from" {
+								fmt.Printf("%s Approve %s subscription\n",
+									v.To, item.Jid)
+								talk.RequestSubscription(item.Jid)
 							}
-							/*
-								//may loop whiel presence is unavailable
-								if item.Subscription == "from" {
-									fmt.Printf("%s Approve %s subscription\n",
-										v.To, item.Jid)
-									talk.RequestSubscription(item.Jid)
-								}
-							*/
-							fmt.Printf("roster item %s subscription(%s), %v\n",
-								item.Jid, item.Subscription, item.Group)
-							if v.Type == "set" && item.Subscription == "both" {
-								// shall we check presence unavailable
-								pr := xmpp.Presence{From: v.To, To: item.Jid,
-									Show: "xa"}
-								talk.SendPresence(pr)
+						*/
+						fmt.Printf("roster item %s subscription(%s), %v\n",
+							item.Jid, item.Subscription, item.Group)
+						if v.Type == "set" && item.Subscription == "both" {
+							// shall we check presence unavailable
+							pr := xmpp.Presence{From: v.To, To: item.Jid,
+								Show: "xa"}
+							talk.SendPresence(pr)
+						}
+					}
+					continue
+				case "vcard-temp":
+					var it vcardTemp
+					if err := xml.Unmarshal(v.Query, &it); err == nil {
+						if it.PhotoType == "image/png" {
+							// PhotoImg is base64 []byte
+							pImg, err := base64.StdEncoding.DecodeString(
+								string(it.PhotoImg))
+							if err != nil {
+								fmt.Println("base64 decode:", err)
+							} else if fd, err := os.Create("/tmp/" + it.Name +
+								".png"); err == nil {
+								fd.Write(pImg)
+								fd.Close()
 							}
 						}
+						fmt.Printf("Got vCard for %s, FN:%s, Nick:%s\n",
+							v.From, it.Name, it.NickName)
+					} else {
+						fmt.Println("vcard-temp vCard", err)
 					}
 					continue
 				}
@@ -230,7 +262,7 @@ func main() {
 					fmt.Printf("Got pong from %s to %s\n", v.From, v.To)
 				} else {
 					fmt.Printf("Got from %s to %s IQ, %s tag:(%v),query(%s)\n",
-						v.From, v.To, v.Type, v.QueryName, v.Query)
+						v.From, v.To, v.Type, query, string(v.Query))
 				}
 			default:
 				fmt.Printf("def: %v\n", v)
