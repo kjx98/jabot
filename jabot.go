@@ -55,8 +55,11 @@ var log = logging.MustGetLogger("jabot")
 // HandleFunc type
 //	used for RegisterHandle
 type HandlerFunc func(args []string) string
+type HookFunc func(args string)
 
 var handlers = map[string]HandlerFunc{}
+var hookName string
+var hookFunc HookFunc
 
 func NewJabot(cfg *Config) (*Jabot, error) {
 	rand.Seed(time.Now().Unix())
@@ -83,6 +86,15 @@ func defTimeFunc(args []string) string {
 func (w *Jabot) RegisterTimeCmd() {
 	w.RegisterHandle("time", defTimeFunc)
 	w.RegisterHandle("时间", defTimeFunc)
+}
+
+func (w *Jabot) RegisterHook(hookStr string, hook HookFunc) {
+	if hook == nil {
+		hookName = ""
+	} else {
+		hookName = hookStr
+		hookFunc = hook
+	}
 }
 
 // SetLogLevel
@@ -171,7 +183,10 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 		return nil
 	}
 	from := w.getNickName(m.Remote)
-	if from != w.nickName {
+	if hookName == from && hookFunc != nil {
+		hookFunc(content)
+		return nil
+	} else if from != w.nickName {
 		log.Info("[*] ", from, ": ", m.Text)
 		cmds := strings.Split(content, ",")
 		if len(cmds) == 0 {
