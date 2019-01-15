@@ -185,7 +185,8 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 	from := w.getNickName(m.Remote)
 	if hookName != "" {
 		log.Info("[H*] ", from, ": ", m.Text)
-		if (hookName == from || from == "") && hookFunc != nil {
+		//if (hookName == from || from == "") && hookFunc != nil {
+		if hookName == from && hookFunc != nil {
 			hookFunc(content)
 		}
 		return nil
