@@ -110,15 +110,18 @@ func main() {
 					fmt.Println("roster", v.Roster)
 				} else {
 					for _, element := range v.OtherElem {
-						if element.XMLName.Space == "jabber:x:conference" {
+						switch element.XMLName.Space {
+						case "jabber:x:conference":
 							// if not join
 							talk.JoinMUCNoHistory(v.Remote, "bot")
-						}
-						// composing, paused, active
-						if element.XMLName.Space ==
-							"http://jabber.org/protocol/chatstates" &&
-							element.XMLName.Local == "composing" {
-							fmt.Println(v.Remote, "is composing")
+						case "http://jabber.org/protocol/chatstates":
+							// composing, paused, active, inactive, gone
+							switch element.XMLName.Local {
+							case "composing":
+								fmt.Println(v.Remote, "is composing")
+							case "gone":
+								fmt.Println(v.Remote, "is gone")
+							}
 						}
 					}
 					if strings.TrimSpace(v.Text) != "" {

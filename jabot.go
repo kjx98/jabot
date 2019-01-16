@@ -121,6 +121,19 @@ func getJid(addr string) string {
 	return addr
 }
 
+func (w *Jabot) Ping() error {
+	if !w.bConnected {
+		return errNoConn
+	}
+	return w.client.PingC2S(w.cfg.Jid, "")
+}
+
+func (w *Jabot) AddChat(jid string) error {
+	pr := xmpp.Presence{From: w.cfg.Jid, To: jid, Show: "xa"}
+	_, err := w.client.SendPresence(pr)
+	return err
+}
+
 func (w *Jabot) updateContacts(contact *Contact) {
 	if contact.NickName == "" {
 		if contact.Name != "" {
