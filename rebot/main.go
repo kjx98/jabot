@@ -39,12 +39,24 @@ func main() {
 		if err != nil {
 			continue
 		}
-		if len(line) >= 4 && strings.ToLower(line[:4]) == "quit" {
+		line = strings.TrimRight(line, "\n")
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		tokens := strings.SplitN(line, " ", 2)
+		if strings.ToLower(tokens[0]) == "quit" {
 			break
 		}
-		line = strings.TrimRight(line, "\n")
+		switch strings.ToLower(tokens[0]) {
+		case "list":
+			contacts := rebot.GetContacts()
+			for _, cc := range contacts {
+				fmt.Println("Contact:", cc.Name, " Jid:", cc.Jid, " NickName:",
+					cc.NickName)
+			}
+		}
 
-		tokens := strings.SplitN(line, " ", 2)
 		if len(tokens) == 2 {
 			rebot.SendMessage(tokens[1], tokens[0])
 		}

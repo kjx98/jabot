@@ -103,7 +103,7 @@ func (w *Jabot) SetLogLevel(l logging.Level) {
 	logging.SetLevel(l, "jabot")
 }
 
-func (w *Jabot) GetContact() error {
+func (w *Jabot) GetRoster() error {
 	return w.client.Roster()
 }
 
@@ -147,6 +147,16 @@ func (w *Jabot) updateContacts(contact *Contact) {
 		contact.Online = cc.Online
 	}
 	w.contacts[contact.Jid] = *contact
+}
+
+func (w *Jabot) GetContacts() []Contact {
+	res := []Contact{}
+	for _, cc := range w.contacts {
+		if cc.Online {
+			res = append(res, cc)
+		}
+	}
+	return res
 }
 
 func (w *Jabot) SendMessage(message string, to string) error {
@@ -494,7 +504,7 @@ func (w *Jabot) Connect() error {
 		w.bConnected = true
 	}
 	w.lastAct = time.Now()
-	w.GetContact()
+	w.GetRoster()
 	return nil
 }
 
