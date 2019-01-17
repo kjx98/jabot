@@ -66,7 +66,7 @@ func NewJabot(cfg *Config) (*Jabot, error) {
 
 	wx := Jabot{
 		cfg:      *cfg,
-		resource: "ebot" + randID[2:17],
+		resource: "ebot-" + randID[2:12],
 		contacts: make(map[string]Contact),
 		auto:     true,
 	}
@@ -206,7 +206,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 	}
 	from := w.getNickName(m.Remote)
 	if hookName != "" {
-		log.Info("[H*] ", from, ": ", m.Text)
+		log.Info("[xH*] ", from, ": ", m.Text)
 		//if (hookName == from || from == "") && hookFunc != nil {
 		if hookName == from && hookFunc != nil {
 			hookFunc(content)
@@ -214,7 +214,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 		return nil
 	}
 	if from != w.nickName {
-		log.Info("[*] ", from, ": ", m.Text)
+		log.Info("[x*] ", from, ": ", m.Text)
 		cmds := strings.Split(content, ",")
 		if len(cmds) == 0 {
 			return nil
@@ -226,7 +226,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 				if err := w.SendMessage(reply, m.Remote); err != nil {
 					return err
 				}
-				log.Info("[#] ", w.getNickName(w.cfg.Jid), ": ", reply)
+				log.Info("[x#] ", w.getNickName(w.cfg.Jid), ": ", reply)
 			}
 		} else {
 			if w.auto {
@@ -238,7 +238,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 				if err := w.SendMessage(reply, m.Remote); err != nil {
 					return err
 				}
-				log.Info("[#] ", w.nickName, ": ", reply)
+				log.Info("[x#] ", w.nickName, ": ", reply)
 			}
 		}
 	} else {
@@ -248,7 +248,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 		case "来人":
 			w.auto = true
 		default:
-			log.Info("[##] ", w.nickName, ": ", m.Text)
+			log.Info("[x##] ", w.nickName, ": ", m.Text)
 			cmds := strings.Split(content, ",")
 			if len(cmds) == 0 {
 				return nil
@@ -261,7 +261,7 @@ func (w *Jabot) handle(m *xmpp.Chat) error {
 						log.Warning("send myself to defGroup", err)
 						return err
 					}
-					log.Info("[#] ", w.nickName, ": ", reply)
+					log.Info("[x#] ", w.nickName, ": ", reply)
 				}
 			}
 		}
@@ -490,6 +490,7 @@ func (w *Jabot) Connect() error {
 		Status:        "xa",
 		StatusMessage: "I'm gopher jabber",
 	}
+	// now could comment out following Skip
 	xmpp.DefaultConfig = tls.Config{
 		InsecureSkipVerify: true,
 	}
