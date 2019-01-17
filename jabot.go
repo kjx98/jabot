@@ -8,12 +8,11 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kjx98/go-xmpp"
-	//"github.com/kjx98/golib/to"
+	"github.com/kjx98/golib/to"
 	"github.com/op/go-logging"
 )
 
@@ -63,7 +62,7 @@ var hookFunc HookFunc
 
 func NewJabot(cfg *Config) (*Jabot, error) {
 	rand.Seed(time.Now().Unix())
-	randID := strconv.Itoa(rand.Int())
+	randID := to.String(rand.Int())
 
 	wx := Jabot{
 		cfg:      *cfg,
@@ -487,7 +486,7 @@ func (w *Jabot) Connect() error {
 	options := xmpp.Options{User: w.cfg.Jid,
 		Password:      w.cfg.Passwd,
 		NoTLS:         true,
-		Resource:      "jabot",
+		Resource:      w.resource,
 		Status:        "xa",
 		StatusMessage: "I'm gopher jabber",
 	}
@@ -519,7 +518,7 @@ func (w *Jabot) Close() error {
 
 func NewJabotConn(talk *xmpp.Client) *Jabot {
 	rand.Seed(time.Now().Unix())
-	randID := strconv.Itoa(rand.Int())
+	randID := to.String(rand.Int())
 
 	wx := Jabot{
 		cfg:      NewConfig(""),
