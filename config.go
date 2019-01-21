@@ -5,6 +5,7 @@ type Config struct {
 	Jid    string
 	Passwd string
 	DefJid string
+	Domain string
 }
 
 type Tuling struct {
@@ -18,8 +19,8 @@ func NewConfig(key string) Config {
 	if key == "" {
 		key = "808811ad0fd34abaa6fe800b44a9556a"
 	}
-	var cfg = Config{Tuling{URL: url,
-		KeyAPI: key}, "", "", "",
+	var cfg = Config{Tuling: Tuling{URL: url, KeyAPI: key},
+		Jid: "test@localhost",
 	}
 	return cfg
 }

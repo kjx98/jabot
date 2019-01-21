@@ -120,6 +120,13 @@ func getJid(addr string) string {
 	return addr
 }
 
+func getDomain(addr string) string {
+	if a := strings.SplitN(getJid(addr), "@", 2); len(a) == 2 {
+		return a[1]
+	}
+	return ""
+}
+
 func (w *Jabot) Ping() error {
 	if !w.bConnected {
 		return errNoConn
@@ -305,6 +312,10 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 				}
 				switch v.Type {
 				case "subscribe":
+					if getDomain(v.From) != w.cfg.Domain {
+						log.Infof("Presence: %s subscription drop", v.From)
+						break
+					}
 					log.Infof("Presence: Approve %s subscription", v.From)
 					w.client.ApproveSubscription(v.From)
 					w.client.RequestSubscription(v.From)
@@ -491,9 +502,7 @@ func (w *Jabot) Connect() error {
 		StatusMessage: "I'm gopher jabber",
 	}
 	// now could comment out following Skip
-	xmpp.DefaultConfig = tls.Config{
-		InsecureSkipVerify: true,
-	}
+	xmpp.DefaultConfig = tls.Config{InsecureSkipVerify: true}
 	if talk, err := options.NewClient(); err != nil {
 		return err
 	} else {
@@ -503,6 +512,7 @@ func (w *Jabot) Connect() error {
 		w.client = talk
 		w.bConnected = true
 	}
+	w.cfg.Domain = getDomain(w.cfg.Jid)
 	w.lastAct = time.Now()
 	w.GetRoster()
 	return nil
