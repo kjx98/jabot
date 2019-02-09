@@ -328,6 +328,10 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						// query vcard
 						cc := w.contacts[jid]
 						//w.updateContacts(&cc)
+						if cc.Jid == "" {
+							cc.Jid = jid
+							cc.Name = w.getNickName(jid)
+						}
 						cc.Online = true
 						w.contacts[jid] = cc
 						if cc.Name == "" || cc.NickName == "" {
@@ -402,6 +406,8 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						cc, ok := w.contacts[item.Jid]
 						if !ok {
 							cc.Jid = item.Jid
+						}
+						if item.Name != "" {
 							cc.Name = item.Name
 						}
 						cc.Subscription = item.Subscription
@@ -415,10 +421,12 @@ func (w *Jabot) dailLoop(timerCnt int) error {
 						}
 						if cc.Jid != "" {
 							w.updateContacts(&cc)
-							// never query vcard here, may loops
-							if cc.Name == "" || cc.NickName == "" {
-								// try vCard
-							}
+							/*
+								// never query vcard here, may loops
+								if cc.Name == "" || cc.NickName == "" {
+									// try vCard
+								}
+							*/
 						}
 						if item.Subscription == "from" && cc.Online {
 							log.Infof("roster: Approve %s subscription", cc.Jid)
